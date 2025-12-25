@@ -545,12 +545,21 @@ export default function App() {
   const DAY_START_MIN = 6 * 60; // 06:00
   const DAY_END_MIN = 22 * 60; // 22:00
   const STEP_MIN = 15;
+  const WEEK_START_MIN = 0;
+  const WEEK_END_MIN = 24 * 60;
 
   const timeRows = useMemo(() => {
     const rows = [];
     for (let m = DAY_START_MIN; m <= DAY_END_MIN; m += STEP_MIN) rows.push(m);
     return rows;
   }, []);
+
+    const weekTimeRows = useMemo(() => {
+    const rows = [];
+    for (let m = WEEK_START_MIN; m <= WEEK_END_MIN; m += STEP_MIN) rows.push(m);
+    return rows;
+  }, []);
+
 
   const dayEventsSorted = useMemo(() => {
     const arr = eventsByDate[selectedISO] ?? [];
@@ -878,8 +887,8 @@ export default function App() {
 
                 <div className="mt-3 w-full overflow-x-auto">
                   <div className="min-w-[980px] rounded-2xl border">
-                    <div className="grid grid-cols-[220px_repeat(7,1fr)] border-b bg-neutral-50">
-                      <div className="p-3 text-sm font-semibold">Aktiviteter</div>
+                        <div className="grid grid-cols-[90px_repeat(7,1fr)] border-b bg-neutral-50">
+                      <div className="p-3 text-xs font-semibold text-neutral-600">Tid</div>
                       {weekDays.map((d) => {
                         const iso = toISODate(d);
                         return (
@@ -898,38 +907,50 @@ export default function App() {
                       })}
                     </div>
 
-                    <div className="grid grid-cols-[220px_repeat(7,1fr)]">
-                      <div className="p-3 text-xs text-neutral-600">
-                        Klicka på en aktivitet för att redigera. + lägger till på valt datum.
-                      </div>
+                                     <div className="border-b px-3 py-2 text-xs text-neutral-600">
+                      Skrolla för att se hela dygnet (00:00–24:00). Klicka på en aktivitet för att redigera. + lägger
+                      till på valt datum.
+                    </div>
 
-                      {weekISOs.map((iso) => {
-                        const items = (eventsByDate[iso] ?? []).slice().sort((a, b) => a.startMin - b.startMin);
+                                         <div className="max-h-[640px] overflow-y-auto">
+                      {weekTimeRows.map((m) => {
+                        const label = m % 60 === 0 ? minutesToHHMM(m) : "";
                         return (
-                          <div key={iso} className="min-h-[160px] border-l p-3">
-                            {items.length === 0 ? (
-                              <div className="text-xs text-neutral-500">Inget planerat</div>
-                            ) : (
-                              <div className="space-y-2">
-                                {items.map((e) => (
-                                  <button
-                                    key={e.id}
-                                    type="button"
-                                    onClick={() => openEditEventModal(iso, e)}
-                                    className="w-full rounded-2xl border p-2 text-left shadow-sm hover:brightness-95"
-                                    style={{
-                                      backgroundColor: e.color || (e.type === "habit" ? "#bbf7d0" : "#93c5fd"),
-                                    }}
-                                    title="Klicka för att redigera"
-                                  >
-                                    <div className="truncate text-xs font-semibold">{e.title}</div>
-                                    <div className="text-[11px] text-neutral-700">
-                                      {minutesToHHMM(e.startMin)} • {e.durationMin} min
+                         <div key={m} className="grid grid-cols-[90px_repeat(7,1fr)] border-b">
+                            <div className="p-2 text-right text-[11px] text-neutral-500">{label}</div>
+                            {weekISOs.map((iso) => {
+                              const rowEvents = (eventsByDate[iso] ?? [])
+                                .filter((e) => e.startMin === m)
+                                .sort((a, b) => a.durationMin - b.durationMin);
+                              return (
+                                <div key={iso} className="min-h-[36px] border-l p-1">
+                                  {rowEvents.length === 0 ? (
+                                    <div className="h-3" />
+                                  ) : (
+                                    <div className="space-y-1">
+                                      {rowEvents.map((e) => (
+                                        <button
+                                          key={e.id}
+                                          type="button"
+                                          onClick={() => openEditEventModal(iso, e)}
+                                          className="w-full rounded-xl border px-2 py-1 text-left text-[11px] shadow-sm hover:brightness-95"
+                                          style={{
+                                            backgroundColor: e.color || (e.type === "habit" ? "#bbf7d0" : "#93c5fd"),
+                                          }}
+                                          title="Klicka för att redigera"
+                                        >
+                                          <div className="truncate font-semibold">{e.title}</div>
+                                          <div className="text-[10px] text-neutral-700">
+                                            {minutesToHHMM(e.startMin)} • {e.durationMin} min
+                                          </div>
+                                        </button>
+                                      ))}
+
                                     </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                                            )}
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
