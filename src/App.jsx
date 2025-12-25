@@ -318,44 +318,65 @@ export default function App() {
   const weekHourRows = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
   // ------------------ Default habit blocks per day ------------------
-  function ensureDefaultHabitBlocksForDay(iso) {
-    const existing = eventsByDate[iso] ?? [];
-    const hasHabitBlocks = existing.some((e) => e.type === "habit");
-    if (hasHabitBlocks) return;
-
-    const startBase = 8 * 60; // 08:00
-    const gap = 10;
-    const dur = 30;
-    let cursor = startBase;
-
-    const newBlocks = activeHabits.map((h) => {
-      const block = {
-        id: uid(),
-        type: "habit",
-        habitId: h.id,
-        title: h.name,
-        startMin: cursor,
-        durationMin: dur,
-        color: "#bbf7d0", // light green
-        notes: "",
-      };
-      cursor += dur + gap;
-      return block;
-    });
-
-    if (newBlocks.length === 0) return;
+  function ensureDefaultHabitBlocksForDates(isos) {
+    if (activeHabits.length === 0 || isos.length === 0) return;
 
     setEventsByDate((prev) => {
-      const cur = prev[iso] ?? [];
-      return { ...prev, [iso]: [...cur, ...newBlocks] };
+            let changed = false;
+      const next = { ...prev };
+
+      isos.forEach((iso) => {
+        const existing = next[iso] ?? [];
+        const habitBlocks = existing.filter((e) => e.type === "habit");
+        const existingHabitIds = new Set(habitBlocks.map((e) => e.habitId));
+        const missingHabits = activeHabits.filter((h) => !existingHabitIds.has(h.id));
+        if (missingHabits.length === 0) return;
+
+        const startBase = 8 * 60; // 08:00
+        const gap = 10;
+        const dur = 30;
+        const lastEnd =
+          habitBlocks.length > 0
+            ? Math.max(...habitBlocks.map((e) => e.startMin + (e.durationMin ?? dur))) + gap
+            : startBase;
+        let cursor = lastEnd;
+
+        const newBlocks = missingHabits.map((h) => {
+          const block = {
+            id: uid(),
+            type: "habit",
+            habitId: h.id,
+            title: h.name,
+            startMin: cursor,
+            durationMin: dur,
+            color: "#bbf7d0", // light green
+            notes: "",
+          };
+          cursor += dur + gap;
+          return block;
+        });
+
+        if (newBlocks.length > 0) {
+          changed = true;
+          next[iso] = [...existing, ...newBlocks];
+        }
+      });
+
+      return changed ? next : prev;
     });
   }
+   const visibleISOs = useMemo(() => {
+    if (view === "week") return weekISOs;
+    if (view === "month") return monthDays.map((d) => toISODate(d));
+    return [selectedISO];
+  }, [view, weekISOs, monthDays, selectedISO]);
+
 
   useEffect(() => {
-    // Auto-create default habit blocks when entering a day first time
-    ensureDefaultHabitBlocksForDay(selectedISO);
+     // Auto-create default habit blocks for all visible days
+    ensureDefaultHabitBlocksForDates(visibleISOs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedISO, activeHabits.length]);
+}, [visibleISOs, activeHabits]);
 
   // ------------------ Event CRUD ------------------
   function addEventForDay(iso, evt) {
@@ -640,7 +661,10 @@ export default function App() {
                       <button
                         key={iso}
                         className={`p-3 text-left text-sm hover:bg-neutral-100 ${isSelected ? "bg-neutral-100" : ""}`}
-                        onClick={() => setSelectedISO(iso)}
+                          onClick={() => {
+                          setSelectedISO(iso);
+                          setView("day");
+                        }}
                         type="button"
                       >
                         <div className="font-semibold">{fmtShortWeekday(d)}</div>
@@ -897,7 +921,10 @@ export default function App() {
                             className={`p-3 text-left text-sm hover:bg-neutral-100 ${
                               iso === selectedISO ? "bg-neutral-100" : ""
                             }`}
-                            onClick={() => setSelectedISO(iso)}
+                             onClick={() => {
+                              setSelectedISO(iso);
+                              setView("day");
+                            }}
                             type="button"
                           >
                             <div className="font-semibold">{fmtShortWeekday(d)}</div>
@@ -987,7 +1014,10 @@ export default function App() {
                     return (
                       <button
                         key={iso}
-                        onClick={() => setSelectedISO(iso)}
+                         onClick={() => {
+                          setSelectedISO(iso);
+                          setView("day");
+                        }}
                         type="button"
                         style={{ backgroundColor: inMonth ? completionColor(dayPct) : "transparent" }}
                         className={`rounded-2xl border p-3 text-left shadow-sm transition hover:brightness-95 ${
