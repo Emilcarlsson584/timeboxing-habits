@@ -229,6 +229,7 @@ export default function App() {
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventModalISO, setEventModalISO] = useState(selectedISO);
   const [editingEventId, setEditingEventId] = useState(null);
+  const [habitModalOpen, setHabitModalOpen] = useState(false);
 
   const [formTime, setFormTime] = useState("09:00");
   const [formTitle, setFormTitle] = useState("");
@@ -314,6 +315,7 @@ export default function App() {
   const weekStart = useMemo(() => startOfISOWeek(selectedDate), [selectedDate]);
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const weekISOs = useMemo(() => weekDays.map((d) => toISODate(d)), [weekDays]);
+  const weekHourRows = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
   // ------------------ Default habit blocks per day ------------------
   function ensureDefaultHabitBlocksForDay(iso) {
@@ -388,6 +390,12 @@ export default function App() {
     setFormNotes("");
     setEventModalOpen(true);
   }
+
+  
+  function openHabitModal() {
+    setHabitModalOpen(true);
+  }
+
 
   function openEditEventModal(iso, evt) {
     setEventModalISO(iso);
@@ -606,124 +614,70 @@ export default function App() {
                   {fmtMonthDay(weekDays[0])}–{fmtMonthDay(weekDays[6])}
                 </Pill>
                 <Pill>Klicka på en dag för att välja datum i kalendern.</Pill>
+                                <IconButton title="Lägg till vana" onClick={openHabitModal}>
+                  +
+                </IconButton>
               </div>
             }
           >
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              {/* Habit manager */}
-              <div className="lg:col-span-1">
-                <div className="rounded-2xl border bg-white p-3 shadow-sm">
-                  <div className="text-sm font-semibold">Habits</div>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      className="w-full rounded-2xl border bg-white px-3 py-2 text-sm"
-                      placeholder="Ny vana (t.ex. Meditation)"
-                      value={newHabitName}
-                      onChange={(e) => setNewHabitName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") addHabit();
-                      }}
-                    />
-                    <button className="rounded-2xl border bg-black px-3 py-2 text-sm text-white" onClick={addHabit}>
-                      Lägg till
-                    </button>
-                  </div>
+         <div className="w-full overflow-x-auto rounded-2xl border bg-white shadow-sm">
+              <div className="min-w-[860px]">
+                <div className="grid grid-cols-[260px_repeat(7,1fr)] border-b bg-neutral-50">
+                  <div className="p-3 text-sm font-semibold">Dagliga vanor</div>
+                  {weekDays.map((d) => {
+                    const iso = toISODate(d);
+                    const isSelected = iso === selectedISO;
+                    return (
+                      <button
+                        key={iso}
+                        className={`p-3 text-left text-sm hover:bg-neutral-100 ${isSelected ? "bg-neutral-100" : ""}`}
+                        onClick={() => setSelectedISO(iso)}
+                        type="button"
+                      >
+                        <div className="font-semibold">{fmtShortWeekday(d)}</div>
+                        <div className="text-xs text-neutral-600">{fmtMonthDay(d)}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                        <div className="divide-y">
+{activeHabits.map((h) => (
+  <div key={h.id} className="grid grid-cols-[260px_repeat(7,1fr)] items-center">
+    <div className="p-3">
+      <div className="text-sm font-semibold">{h.name}</div>
+      <div className="text-xs text-neutral-600">Bocka av per dag</div>
+    </div>
 
-                  <div className="mt-3 space-y-2">
-                    {habits.map((h) => (
-                      <div key={h.id} className="flex items-center justify-between gap-2 rounded-2xl border p-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold">{h.name}</div>
-                          <div className="text-xs text-neutral-600">{h.active ? "Aktiv" : "Inaktiv"}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            className="rounded-xl border bg-white px-2 py-1 text-xs"
-                            onClick={() => toggleHabitActive(h.id)}
-                            type="button"
-                          >
-                            {h.active ? "Inaktivera" : "Aktivera"}
-                          </button>
-                          <button
-                            className="rounded-xl border bg-white px-2 py-1 text-xs"
-                            onClick={() => deleteHabit(h.id)}
-                            type="button"
-                            title="Ta bort"
-                          >
-                            Ta bort
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {habits.length === 0 && <div className="text-sm text-neutral-600">Inga habits ännu.</div>}
-                  </div>
+    {weekISOs.map((iso) => {
+      const checked = !!habitChecksByDate[iso]?.[h.id];
 
-                  <div className="mt-3 rounded-2xl border bg-neutral-50 p-3 text-xs text-neutral-700">
-                    Dagvyn auto-lägger in default-block för alla aktiva habits första gången du öppnar en dag.
-                  </div>
+      return (
+        <div key={iso} className="flex items-center justify-center p-3">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => setHabitCheckForDate(iso, h.id, e.target.checked)}
+            className="h-4 w-4"
+          />
+        </div>
+      );
+    })}
+  </div>
+))}
+
+                  {activeHabits.length === 0 && (
+                    <div className="p-4 text-sm text-neutral-600">
+                      Inga aktiva vanor ännu. Lägg till en med + uppe till höger.
+
+
+                    </div>
+         )}
                 </div>
               </div>
-
-              {/* Weekly grid */}
-              <div className="lg:col-span-2">
-                <div className="w-full overflow-x-auto rounded-2xl border bg-white shadow-sm">
-                  <div className="min-w-[860px]">
-                    <div className="grid grid-cols-[260px_repeat(7,1fr)] border-b bg-neutral-50">
-                      <div className="p-3 text-sm font-semibold">Dagliga vanor</div>
-                      {weekDays.map((d) => {
-                        const iso = toISODate(d);
-                        const isSelected = iso === selectedISO;
-                        return (
-                          <button
-                            key={iso}
-                            className={`p-3 text-left text-sm hover:bg-neutral-100 ${isSelected ? "bg-neutral-100" : ""}`}
-                            onClick={() => setSelectedISO(iso)}
-                            type="button"
-                          >
-                            <div className="font-semibold">{fmtShortWeekday(d)}</div>
-                            <div className="text-xs text-neutral-600">{fmtMonthDay(d)}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <div className="divide-y">
-                      {activeHabits.map((h) => (
-                        <div key={h.id} className="grid grid-cols-[260px_repeat(7,1fr)] items-center">
-                          <div className="p-3">
-                            <div className="text-sm font-semibold">{h.name}</div>
-                            <div className="text-xs text-neutral-600">Bocka av per dag</div>
-                          </div>
-
-                          {weekISOs.map((iso) => {
-                            const checked = !!habitChecksByDate[iso]?.[h.id];
-                            return (
-                              <div key={iso} className="flex items-center justify-center p-3">
-                                <input
-                                  type="checkbox"
-                                  checked={checked}
-                                  onChange={(e) => setHabitCheckForDate(iso, h.id, e.target.checked)}
-                                  className="h-4 w-4"
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                      {activeHabits.length === 0 && (
-                        <div className="p-4 text-sm text-neutral-600">
-                          Inga aktiva habits. Aktivera eller skapa habits till vänster.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-2xl border bg-white p-3 text-sm text-neutral-700 shadow-sm">
-                  Klicka på ett event i kalendern för att redigera. Använd + uppe till höger i kalendern för att lägga till
-                  aktiviteter.
-                </div>
-              </div>
+            </div>
+                        <div className="mt-3 rounded-2xl border bg-white p-3 text-sm text-neutral-700 shadow-sm">
+              Klicka på ett event i kalendern för att redigera. Använd + uppe till höger i kalendern för att lägga till
+              aktiviteter.
             </div>
           </Section>
         </div>
@@ -1158,6 +1112,59 @@ export default function App() {
           {!formTitle.trim() ? (
             <div className="text-xs text-neutral-600">Obs: Namn måste fyllas i för att spara.</div>
           ) : null}
+        </div>
+      </Modal>
+      
+      {/* Habit Modal */}
+      <Modal open={habitModalOpen} title="Hantera vanor" onClose={() => setHabitModalOpen(false)}>
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            <input
+              className="w-full rounded-2xl border bg-white px-3 py-2 text-sm"
+              placeholder="Ny vana (t.ex. Meditation)"
+              value={newHabitName}
+              onChange={(e) => setNewHabitName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addHabit();
+              }}
+            />
+            <button className="rounded-2xl border bg-black px-3 py-2 text-sm text-white" onClick={addHabit} type="button">
+              Lägg till
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {habits.map((h) => (
+              <div key={h.id} className="flex items-center justify-between gap-2 rounded-2xl border p-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{h.name}</div>
+                  <div className="text-xs text-neutral-600">{h.active ? "Aktiv" : "Inaktiv"}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className="rounded-xl border bg-white px-2 py-1 text-xs"
+                    onClick={() => toggleHabitActive(h.id)}
+                    type="button"
+                  >
+                    {h.active ? "Inaktivera" : "Aktivera"}
+                  </button>
+                  <button
+                    className="rounded-xl border bg-white px-2 py-1 text-xs"
+                    onClick={() => deleteHabit(h.id)}
+                    type="button"
+                    title="Ta bort"
+                  >
+                    Ta bort
+                  </button>
+                </div>
+              </div>
+            ))}
+            {habits.length === 0 && <div className="text-sm text-neutral-600">Inga vanor ännu.</div>}
+          </div>
+
+          <div className="rounded-2xl border bg-neutral-50 p-3 text-xs text-neutral-700">
+            Dagvyn auto-lägger in default-block för alla aktiva vanor första gången du öppnar en dag.
+          </div>
         </div>
       </Modal>
     </div>
