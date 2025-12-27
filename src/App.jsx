@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+
 /**
  * Timeboxing + Habits
  * - Weekly habits grid (top)
@@ -217,6 +218,7 @@ export default function App() {
   const selectedDate = useMemo(() => parseISODate(selectedISO), [selectedISO]);
 
   const [view, setView] = useState("day"); // day | week | month
+  const TIME_GRID_STEP_MIN = 15;
 
   const [habits, setHabits] = useState(DEFAULT_HABITS);
   const [habitChecksByDate, setHabitChecksByDate] = useState({});
@@ -318,11 +320,20 @@ export default function App() {
   const weekHourRows = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
 
   // ------------------ Default habit blocks per day ------------------
+
+    function snapToTimeGrid(minutes) {
+    return Math.ceil(minutes / TIME_GRID_STEP_MIN) * TIME_GRID_STEP_MIN;
+  }
+
+  function ensureDefaultHabitBlocksForDay(iso) {
+    ensureDefaultHabitBlocksForDates([iso]);
+  }
+
   function ensureDefaultHabitBlocksForDates(isos) {
     if (activeHabits.length === 0 || isos.length === 0) return;
 
     setEventsByDate((prev) => {
-            let changed = false;
+      let changed = false;
       const next = { ...prev };
 
       isos.forEach((iso) => {
@@ -333,13 +344,13 @@ export default function App() {
         if (missingHabits.length === 0) return;
 
         const startBase = 8 * 60; // 08:00
-        const gap = 10;
+         const gap = TIME_GRID_STEP_MIN;
         const dur = 30;
         const lastEnd =
           habitBlocks.length > 0
             ? Math.max(...habitBlocks.map((e) => e.startMin + (e.durationMin ?? dur))) + gap
             : startBase;
-        let cursor = lastEnd;
+        let cursor = snapToTimeGrid(lastEnd);
 
         const newBlocks = missingHabits.map((h) => {
           const block = {
@@ -352,7 +363,7 @@ export default function App() {
             color: "#bbf7d0", // light green
             notes: "",
           };
-          cursor += dur + gap;
+          cursor = snapToTimeGrid(cursor + dur + gap);
           return block;
         });
 
@@ -365,19 +376,7 @@ export default function App() {
       return changed ? next : prev;
     });
   }
-   const visibleISOs = useMemo(() => {
-    if (view === "week") return weekISOs;
-    if (view === "month") return monthDays.map((d) => toISODate(d));
-    return [selectedISO];
-  }, [view, weekISOs, monthDays, selectedISO]);
-
-
-  useEffect(() => {
-     // Auto-create default habit blocks for all visible days
-    ensureDefaultHabitBlocksForDates(visibleISOs);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [visibleISOs, activeHabits]);
-
+  
   // ------------------ Event CRUD ------------------
   function addEventForDay(iso, evt) {
     setEventsByDate((prev) => {
@@ -539,6 +538,19 @@ export default function App() {
     return out;
   }, [selectedDate]);
 
+   const visibleISOs = useMemo(() => {
+    if (view === "week") return weekISOs;
+    if (view === "month") return monthDays.map((d) => toISODate(d));
+    return [selectedISO];
+  }, [view, weekISOs, monthDays, selectedISO]);
+
+  useEffect(() => {
+    // Auto-create default habit blocks for all visible days
+    ensureDefaultHabitBlocksForDates(visibleISOs);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleISOs, activeHabits]);
+
+
   // ------------------ Navigation ------------------
   function goPrev() {
     if (view === "day") setSelectedISO(toISODate(addDays(selectedDate, -1)));
@@ -565,7 +577,8 @@ export default function App() {
   // ------------------ Day view time grid ------------------
   const DAY_START_MIN = 6 * 60; // 06:00
   const DAY_END_MIN = 22 * 60; // 22:00
-  const STEP_MIN = 15;
+  const STEP_MIN = TIME_GRID_STEP_MIN;
+  const ROW_HEIGHT_PX = 32;
   const WEEK_START_MIN = 0;
   const WEEK_END_MIN = 24 * 60;
 
@@ -810,8 +823,8 @@ export default function App() {
                                 }
                                 setDragPayload(null);
                               }}
-                              className="relative flex items-stretch border-b"
-                            >
+                               className="relative flex items-stretch border-b overflow-visible"
+                              style={{ height: ROW_HEIGHT_PX }}>
                               <div className="w-16 shrink-0 p-2 text-right text-xs text-neutral-500">{label}</div>
 
                               <div className="flex-1 p-2">
@@ -828,6 +841,7 @@ export default function App() {
                                         className="cursor-pointer rounded-2xl border p-2 text-sm shadow-sm hover:brightness-95"
                                         style={{
                                           backgroundColor: e.color || (e.type === "habit" ? "#bbf7d0" : "#93c5fd"),
+                                            height: `${Math.max(1, (e.durationMin ?? STEP_MIN) / STEP_MIN) * ROW_HEIGHT_PX}px`,
                                         }}
                                         title="Klicka för att redigera • Dra för att flytta"
                                       >
@@ -943,14 +957,18 @@ export default function App() {
                       {weekTimeRows.map((m) => {
                         const label = m % 60 === 0 ? minutesToHHMM(m) : "";
                         return (
-                         <div key={m} className="grid grid-cols-[90px_repeat(7,1fr)] border-b">
+                             <div
+                           key={m}
+                           className="grid grid-cols-[90px_repeat(7,1fr)] border-b"
+                           style={{ height: ROW_HEIGHT_PX }}
+                         >
                             <div className="p-2 text-right text-[11px] text-neutral-500">{label}</div>
                             {weekISOs.map((iso) => {
                               const rowEvents = (eventsByDate[iso] ?? [])
                                 .filter((e) => e.startMin === m)
                                 .sort((a, b) => a.durationMin - b.durationMin);
                               return (
-                                <div key={iso} className="min-h-[36px] border-l p-1">
+                                 <div key={iso} className="relative overflow-visible border-l p-1">
                                   {rowEvents.length === 0 ? (
                                     <div className="h-3" />
                                   ) : (
@@ -963,6 +981,7 @@ export default function App() {
                                           className="w-full rounded-xl border px-2 py-1 text-left text-[11px] shadow-sm hover:brightness-95"
                                           style={{
                                             backgroundColor: e.color || (e.type === "habit" ? "#bbf7d0" : "#93c5fd"),
+                                            height: `${Math.max(1, (e.durationMin ?? STEP_MIN) / STEP_MIN) * ROW_HEIGHT_PX}px`,
                                           }}
                                           title="Klicka för att redigera"
                                         >
